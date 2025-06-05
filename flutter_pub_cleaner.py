@@ -56,12 +56,13 @@ def is_flutter_project(folder_path):
     pubspec_path = os.path.join(folder_path, "pubspec.yaml")
     return os.path.exists(pubspec_path)
 
-def clean_flutter_project(project_path):
+def clean_flutter_project(project_path, use_fvm=True):
     """
-    Execute 'fvm flutter clean' in the given Flutter project directory
+    Execute Flutter clean command in the given Flutter project directory
     and return size information before and after cleaning
     """
     project_name = os.path.basename(project_path)
+    command_name = "fvm flutter clean" if use_fvm else "flutter clean"
     
     try:
         print(f"🧹 Cleaning Flutter project: {project_name}")
@@ -71,9 +72,16 @@ def clean_flutter_project(project_path):
         size_before = get_folder_size(project_path)
         print(f"  📊 Size before: {format_size(size_before)}")
         
+        # Prepare command based on FVM preference
+        if use_fvm:
+            command = ["fvm", "flutter", "clean"]
+        else:
+            command = ["flutter", "clean"]
+        
         # Execute flutter clean
+        print(f"  🔧 Running: {command_name}")
         result = subprocess.run(
-            ["fvm", "flutter", "clean"],
+            command,
             cwd=project_path,
             capture_output=True,
             text=True,
@@ -111,7 +119,10 @@ def clean_flutter_project(project_path):
             'size_saved': 0
         }
     except FileNotFoundError:
-        print("  ❌ 'fvm' command not found. Please make sure FVM is installed and in your PATH.")
+        if use_fvm:
+            print("  ❌ 'fvm' command not found. Please make sure FVM is installed and in your PATH.")
+        else:
+            print("  ❌ 'flutter' command not found. Please make sure Flutter SDK is installed and in your PATH.")
         return {
             'success': False,
             'size_before': 0,
@@ -119,12 +130,38 @@ def clean_flutter_project(project_path):
             'size_saved': 0
         }
 
+def ask_fvm_preference():
+    """
+    Ask user if they want to use FVM or regular Flutter
+    """
+    print("🔧 Flutter Version Management")
+    print("-" * 40)
+    print("Do you want to use FVM (Flutter Version Management) or regular Flutter?")
+    print("1. Use FVM (fvm flutter clean)")
+    print("2. Use regular Flutter (flutter clean)")
+    
+    while True:
+        choice = input("\nEnter your choice (1 or 2): ").strip()
+        
+        if choice == "1":
+            print("✅ Using FVM for Flutter commands")
+            return True
+        elif choice == "2":
+            print("✅ Using regular Flutter commands")
+            return False
+        else:
+            print("❌ Invalid choice. Please enter 1 or 2.")
+
 def scan_and_clean_flutter_projects():
     """
     Prompts user for a parent folder path, scans all subdirectories for Flutter projects,
-    and executes 'fvm flutter clean' on each Flutter project found with size tracking.
+    and executes Flutter clean on each Flutter project found with size tracking.
     """
     try:
+        # Ask about FVM preference first
+        use_fvm = ask_fvm_preference()
+        print()
+        
         # Get folder path from user input
         parent_folder = input("Enter the parent folder path containing Flutter projects: ").strip()
         
@@ -183,8 +220,12 @@ def scan_and_clean_flutter_projects():
         print(f"\n🎯 Found {len(flutter_projects)} Flutter project(s)")
         print("-" * 60)
         
+        # Show which command will be used
+        command_description = "fvm flutter clean" if use_fvm else "flutter clean"
+        print(f"📋 Command to execute: {command_description}")
+        
         # Ask for confirmation
-        response = input(f"Do you want to run 'fvm flutter clean' on all {len(flutter_projects)} project(s)? (y/N): ").strip().lower()
+        response = input(f"Do you want to run '{command_description}' on all {len(flutter_projects)} project(s)? (y/N): ").strip().lower()
         
         if response not in ['y', 'yes']:
             print("⏹️  Operation cancelled.")
@@ -203,7 +244,7 @@ def scan_and_clean_flutter_projects():
         # Clean each Flutter project
         for i, project_path in enumerate(flutter_projects, 1):
             print(f"\n[{i}/{len(flutter_projects)}] Processing project...")
-            result = clean_flutter_project(project_path)
+            result = clean_flutter_project(project_path, use_fvm)
             
             if result['success']:
                 successful_cleans += 1
@@ -219,6 +260,7 @@ def scan_and_clean_flutter_projects():
         print("\n" + "=" * 80)
         print("📊 CLEANUP SUMMARY")
         print("=" * 80)
+        print(f"🔧 Command used: {command_description}")
         print(f"✅ Successfully cleaned: {successful_cleans} project(s)")
         if failed_cleans > 0:
             print(f"❌ Failed to clean: {failed_cleans} project(s)")
@@ -243,7 +285,7 @@ def scan_and_clean_flutter_projects():
 
 if __name__ == "__main__":
     print("🎯 Flutter Projects Batch Cleaner with Size Tracking")
-    print("This script will scan a folder for Flutter projects, run 'fvm flutter clean' on each one,")
+    print("This script will scan a folder for Flutter projects, run Flutter clean on each one,")
     print("and show you how much space is saved!")
     print("=" * 90)
     scan_and_clean_flutter_projects()
